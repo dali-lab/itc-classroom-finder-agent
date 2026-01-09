@@ -166,10 +166,18 @@ LangServe is the official deployment solution for LangChain applications:
 
 ### Development Mode
 ```bash
-# Start the development server
-langgraph dev
+# Start the development server on port 2024
+langgraph dev --host 0.0.0.0 --port 2024
 
-# Access LangGraph Studio at http://localhost:8123
+# Or use the default port (2024) with explicit host binding
+langgraph dev --host 0.0.0.0
+
+# Access the server using these URLs:
+# - API Documentation: http://localhost:2024/docs
+# - LangGraph Studio: https://smith.langchain.com/studio/?baseUrl=http://localhost:2024
+# 
+# Note: Use 'localhost' or '127.0.0.1' in browser URLs, NOT '0.0.0.0'
+# The root path (/) returns 404 - use /docs for API documentation
 ```
 
 ### Production Mode
