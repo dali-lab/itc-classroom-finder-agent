@@ -2,6 +2,19 @@ from langchain_core.tools import tool
 from typing import Optional, List, Dict, Any
 import httpx
 from .constants import ROUTES
+import json
+
+# Global variable to store classroom data for the current conversation
+_classroom_data: Optional[List[Dict[str, Any]]] = None
+
+def get_classroom_data() -> Optional[List[Dict[str, Any]]]:
+    """Get the stored classroom data from the last tool call."""
+    return _classroom_data
+
+def clear_classroom_data():
+    """Clear the stored classroom data."""
+    global _classroom_data
+    _classroom_data = None
 
 @tool(
         "query_classrooms_basic",
@@ -29,6 +42,8 @@ def query_classrooms_basic(
         A formatted string with classroom results
     """
     try:
+        global _classroom_data
+        
         # Build query parameters
         params = {
             "limit": 50
@@ -57,7 +72,11 @@ def query_classrooms_basic(
             classrooms = data.get("data", [])
             
             if not classrooms:
+                _classroom_data = None
                 return "No classrooms found matching the basic criteria. Try adjusting the requirements."
+            
+            # Store full classroom data for frontend
+            _classroom_data = classrooms[:10]  # Store top 10 classrooms
             
             # Format results for LLM
             result_text = f"Found {len(classrooms)} classrooms:\n\n"
@@ -127,8 +146,10 @@ def query_classrooms_with_amenities(
         A formatted string with detailed classroom results
     """
     try:
+        global _classroom_data
+        
         # Build query parameters with all filters
-        params = {"limit": 3}
+        params = {"limit": 10}  # Increased from 3 to show more options
         
         # Essential criteria
         if seminar_setup:
@@ -188,7 +209,11 @@ def query_classrooms_with_amenities(
             classrooms = data.get("data", [])
             
             if not classrooms:
+                _classroom_data = None
                 return "No classrooms found matching all the specified amenities. Consider relaxing some requirements."
+            
+            # Store full classroom data for frontend
+            _classroom_data = classrooms
             
             # Format detailed results
             result_text = f"Found {len(classrooms)} classroom(s) with your amenities:\n\n"

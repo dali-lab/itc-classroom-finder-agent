@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any
 import os
 from dotenv import load_dotenv
 from agent import workflow
+from utils.tools import get_classroom_data, clear_classroom_data
 import uuid
 
 load_dotenv()
@@ -43,6 +44,9 @@ async def chat_endpoint(
     Expected to be called by the backend with proper authorization.
     """
     try:
+        # Clear previous classroom data
+        clear_classroom_data()
+        
         # Validate authorization header from backend
         if not authorization:
             raise HTTPException(status_code=401, detail="Authorization header required")
@@ -72,10 +76,8 @@ async def chat_endpoint(
                 for msg in response["messages"]
             )
             
-            # Extract classroom data if available
-            classrooms = None
-            if hasattr(last_message, "artifact") and last_message.artifact:
-                classrooms = last_message.artifact
+            # Get classroom data from tools
+            classrooms = get_classroom_data()
             
             return ChatResponse(
                 message=last_message.content,
