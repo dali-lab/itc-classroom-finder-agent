@@ -28,6 +28,7 @@ When presenting results, describe them in a helpful way and offer to search agai
 workflow = create_react_agent(
     model, 
     tools=tools,
+    prompt=system_prompt,
 )
 
 async def chat():

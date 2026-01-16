@@ -1,13 +1,13 @@
 from langchain_core.tools import tool
 from typing import Optional, List, Dict, Any
 import httpx
-import os
+from .constants import ROUTES
 
-# Backend URL - should be set via environment variable
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
-
-@tool
-async def query_classrooms_basic(
+@tool(
+        "query_classrooms_basic",
+        description="Query classrooms based on essential criteria: class style (seminar, lecture, or group learning) and class size."
+)
+def query_classrooms_basic(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
     group_learning: bool = False,
@@ -45,9 +45,9 @@ async def query_classrooms_basic(
             params["maxSeats"] = class_size + 10
             
         # Call backend classroom service
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{BACKEND_URL}/api/classrooms",
+        with httpx.Client() as client:
+            response = client.get(
+                ROUTES.classrooms,
                 params=params,
                 timeout=10.0
             )
@@ -69,8 +69,11 @@ async def query_classrooms_basic(
     except Exception as e:
         return f"Error querying classrooms: {str(e)}"
 
-@tool
-async def query_classrooms_with_amenities(
+@tool(
+        "query_classrooms_with_amenities",
+        description="Query classrooms with specific amenities and features."
+)
+def query_classrooms_with_amenities(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
     group_learning: bool = False,
@@ -173,9 +176,9 @@ async def query_classrooms_with_amenities(
             params["filmScreening"] = str(film_screening).lower()
             
         # Call backend classroom service
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{BACKEND_URL}/api/classrooms",
+        with httpx.Client() as client:
+            response = client.get(
+                ROUTES.classrooms,
                 params=params,
                 timeout=10.0
             )

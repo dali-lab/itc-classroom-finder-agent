@@ -89,6 +89,11 @@ async def chat_endpoint(
         print(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/")
+async def health_check():
+    """Base endpoint"""
+    return {"message": "Welcome to agent!"}
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

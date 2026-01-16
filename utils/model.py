@@ -15,6 +15,6 @@ if not openai_api_key:
 
 
 model = ChatOpenAI(
-    model="gpt-5",
-    api_key=openai_api_key
+    model="gpt-5-mini",
+    api_key=openai_api_key,
 )
