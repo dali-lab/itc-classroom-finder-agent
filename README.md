@@ -1,51 +1,30 @@
-# Simple Agent Template using LangGraph and Python
+# Classroom Finder Agent using LangChain
 
-A simple ReAct agent template built with LangGraph that demonstrates how to create conversational AI agents with tool usage capabilities.
+A LangChain-based agent service that helps professors find suitable classrooms at Dartmouth College based on their teaching requirements.
+
+## Overview
+
+This agent replaces the hardcoded tool invocation approach with LangChain's built-in tool calling capabilities. It provides a FastAPI endpoint that the backend can call to process classroom search requests using natural language.
+
+## Architecture
+
+- Frontend -> Backend -> Agent Service
+- Backend handles authentication and type validation
+- Agent uses LangChain for intelligent tool selection
+- Tools query the backend's classroom database
 
 ## Prerequisites
 
 ### Model Setup
 
-This template requires a language model to function. You have several options:
-
-#### Option 1: Local Model with Ollama (Recommended for Development)
-
-1. **Install Ollama:**
-   ```bash
-   # macOS
-   brew install ollama
-   
-   # Linux
-   curl -fsSL https://ollama.ai/install.sh | sh
-   
-   # Windows
-   # Download from https://ollama.ai/download
-   ```
-
-2. **Download a model:**
-   ```bash
-   # Download a model (choose one based on your hardware)
-   ollama pull llama3.2:3b        # Lightweight, good for testing
-   ollama pull llama3.2:1b         # Very lightweight
-   ollama pull qwen2.5:7b          # Good balance of performance/size
-   ollama pull mistral:7b          # High quality
-   ```
-
-3. **Update the model in `utils/model.py`:**
-   ```python
-   model = ChatOllama(
-       model="gpt-oss:20b",  # You need to use this model for tool executions
-       temperature=0
-   )
-   ```
-
-#### Option 2: OpenAI API (Requires API Key)
+This template uses OpenAI models via LangChain. You need an OpenAI API key.
 
 1. **Get an OpenAI API key** from [OpenAI Platform](https://platform.openai.com/api-keys)
 
-2. **Set environment variable:**
+2. **Create .env file:**
    ```bash
-   export OPENAI_API_KEY="your-api-key-here"
+   cp .env.example .env
+   # Edit .env and add your OPENAI_API_KEY
    ```
 
 3. **Update `utils/model.py`:**
@@ -68,30 +47,73 @@ For other providers (Anthropic, Google, etc.), update `utils/model.py` with the 
 
 LangGraph provides a development server that automatically reloads your graph when you make changes:
 
+## Installation
+
 1. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Start the development server:**
+2. **Configure environment:**
    ```bash
-   langgraph dev
+   cp .env.example .env
+   # Edit .env and set:
+   # - OPENAI_API_KEY
+   # - BACKEND_URL (URL of the backend API, e.g., http://localhost:5000)
+   # - PORT (agent service port, default: 8000)
    ```
 
-3. **Access the LangGraph Studio:**
-   - Open your browser to `http://localhost:8123`
-   - This provides a visual interface to test and debug your agent
-   - You can see the graph execution flow, inspect state, and test different inputs
+## Running the Agent
 
-### Key Features of Development Mode:
+### Option 1: FastAPI Server (Recommended for Production)
 
-- **Hot Reload**: Automatically reloads when you change your code
-- **Visual Debugging**: See the execution flow of your agent
-- **State Inspection**: View the state at each step
-- **Interactive Testing**: Test your agent with different inputs
-- **Graph Visualization**: Visual representation of your agent's workflow
+Run the FastAPI server that the backend will call:
 
-### Configuration
+```bash
+python app.py
+```
+
+The agent will be available at `http://localhost:8000` with the following endpoints:
+- `POST /chat` - Main chat endpoint
+- `GET /health` - Health check endpoint
+
+### Option 2: CLI Mode (For Testing)
+
+Test the agent interactively in the terminal:
+
+```bash
+python main.py
+```
+
+This runs a simple chat loop where you can test the agent directly.
+
+### Option 3: LangGraph Studio (For Development)
+
+Use LangGraph Studio for visual debugging:
+
+```bash
+langgraph dev
+```
+
+## How It Works
+
+1. Backend receives chat request from frontend with user authentication
+2. Backend validates Dartmouth token and forwards to agent service
+3. Agent processes messages using LangChain workflow
+4. Agent decides whether to:
+   - Gather more information from user
+   - Call query_classrooms_basic tool for initial search
+   - Call query_classrooms_with_amenities tool for detailed search
+5. Tools make HTTP requests to backend classroom API
+6. Agent formats results and returns to backend
+7. Backend sends response to frontend
+
+## Tools Available
+
+- **query_classrooms_basic**: Search by class style and size
+- **query_classrooms_with_amenities**: Search with detailed amenities
+
+## Configuration
 
 The `langgraph.json` file configures your graph:
 
@@ -105,20 +127,6 @@ The `langgraph.json` file configures your graph:
 }
 ```
 
-## Deployment Options
-
-### Option 1: LangServe (Recommended for Production)
-
-LangServe is the official deployment solution for LangChain applications:
-
-1. **Install LangServe:**
-   ```bash
-   pip install langserve
-   ```
-
-2. **Create a deployment script (`deploy.py`):**
-   ```python
-   from langserve import add_routes
    from fastapi import FastAPI
    from agent import workflow
    
