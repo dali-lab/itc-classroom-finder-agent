@@ -1,0 +1,31 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install system dependencies if needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Expose the port (default 2024, can be overridden with PORT env var)
+EXPOSE 2024
+
+# Set default environment variables
+ENV PORT=2024
+
+# Health check to ensure the server is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:2024/docs')" || exit 1
+
+# Start the langgraph dev server
+# Use PORT environment variable if set, otherwise default to 2024
+CMD ["sh", "-c", "langgraph dev --host 0.0.0.0 --port ${PORT:-2024}"]
+

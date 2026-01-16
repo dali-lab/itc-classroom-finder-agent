@@ -4,7 +4,6 @@ from langchain.agents import create_agent
 from utils.model import model
 from utils.tools import tools
 
-
 system_prompt = """You are a helpful classroom finder assistant for Dartmouth College.
 
 Your goal is to help professors find the best classroom for their teaching needs.
@@ -62,4 +61,3 @@ def chat():
 
 if __name__ == "__main__":
     chat()
-
