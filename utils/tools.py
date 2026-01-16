@@ -1,13 +1,26 @@
 from langchain_core.tools import tool
 from typing import Optional, List, Dict, Any
 import httpx
-import os
+from .constants import ROUTES
+import json
 
-# Backend URL - should be set via environment variable
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
+# Global variable to store classroom data for the current conversation
+_classroom_data: Optional[List[Dict[str, Any]]] = None
 
-@tool
-async def query_classrooms_basic(
+def get_classroom_data() -> Optional[List[Dict[str, Any]]]:
+    """Get the stored classroom data from the last tool call."""
+    return _classroom_data
+
+def clear_classroom_data():
+    """Clear the stored classroom data."""
+    global _classroom_data
+    _classroom_data = None
+
+@tool(
+        "query_classrooms_basic",
+        description="Query classrooms based on essential criteria: class style (seminar, lecture, or group learning) and class size."
+)
+def query_classrooms_basic(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
     group_learning: bool = False,
@@ -29,6 +42,8 @@ async def query_classrooms_basic(
         A formatted string with classroom results
     """
     try:
+        global _classroom_data
+        
         # Build query parameters
         params = {
             "limit": 50
@@ -45,9 +60,9 @@ async def query_classrooms_basic(
             params["maxSeats"] = class_size + 10
             
         # Call backend classroom service
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{BACKEND_URL}/api/classrooms",
+        with httpx.Client() as client:
+            response = client.get(
+                ROUTES.classrooms,
                 params=params,
                 timeout=10.0
             )
@@ -57,7 +72,11 @@ async def query_classrooms_basic(
             classrooms = data.get("data", [])
             
             if not classrooms:
+                _classroom_data = None
                 return "No classrooms found matching the basic criteria. Try adjusting the requirements."
+            
+            # Store full classroom data for frontend
+            _classroom_data = classrooms[:10]  # Store top 10 classrooms
             
             # Format results for LLM
             result_text = f"Found {len(classrooms)} classrooms:\n\n"
@@ -69,8 +88,11 @@ async def query_classrooms_basic(
     except Exception as e:
         return f"Error querying classrooms: {str(e)}"
 
-@tool
-async def query_classrooms_with_amenities(
+@tool(
+        "query_classrooms_with_amenities",
+        description="Query classrooms with specific amenities and features."
+)
+def query_classrooms_with_amenities(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
     group_learning: bool = False,
@@ -124,8 +146,10 @@ async def query_classrooms_with_amenities(
         A formatted string with detailed classroom results
     """
     try:
+        global _classroom_data
+        
         # Build query parameters with all filters
-        params = {"limit": 3}
+        params = {"limit": 10}  # Increased from 3 to show more options
         
         # Essential criteria
         if seminar_setup:
@@ -173,9 +197,9 @@ async def query_classrooms_with_amenities(
             params["filmScreening"] = str(film_screening).lower()
             
         # Call backend classroom service
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{BACKEND_URL}/api/classrooms",
+        with httpx.Client() as client:
+            response = client.get(
+                ROUTES.classrooms,
                 params=params,
                 timeout=10.0
             )
@@ -185,7 +209,11 @@ async def query_classrooms_with_amenities(
             classrooms = data.get("data", [])
             
             if not classrooms:
+                _classroom_data = None
                 return "No classrooms found matching all the specified amenities. Consider relaxing some requirements."
+            
+            # Store full classroom data for frontend
+            _classroom_data = classrooms
             
             # Format detailed results
             result_text = f"Found {len(classrooms)} classroom(s) with your amenities:\n\n"

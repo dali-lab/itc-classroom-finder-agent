@@ -19,15 +19,19 @@ Once you have these basics, use the query_classrooms_basic tool to show initial 
 If the user wants more specific features (like projectors, whiteboards, air conditioning, etc.),
 ask about those amenities and then use the query_classrooms_with_amenities tool.
 
-Be friendly, concise, and guide the conversation naturally.
-Do not make assumptions - always confirm requirements with the user first.
+IMPORTANT: When presenting classroom results, be concise. The full classroom details with images will be shown as cards to the user, so you only need to:
+- Briefly mention how many rooms were found
+- Highlight 1-2 top matches if there's an exact or near-exact fit
+- Ask if they need specific amenities or want to adjust the search
 
-When presenting results, describe them in a helpful way and offer to search again with different criteria if needed.
+Be friendly, helpful, and guide the conversation naturally.
+Do not make assumptions - always confirm requirements with the user first.
 """
 
 workflow = create_react_agent(
     model, 
     tools=tools,
+    prompt=system_prompt,
 )
 
 async def chat():
