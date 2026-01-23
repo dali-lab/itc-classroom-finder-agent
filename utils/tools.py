@@ -1,13 +1,26 @@
 from langchain_core.tools import tool
 from typing import Optional, List, Dict, Any
-import httpx
+from supabase import create_client, Client
 import os
+from dotenv import load_dotenv
 
-# Backend URL - should be set via environment variable
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
+# Load environment variables from .env file
+load_dotenv()
+
+# Supabase Configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError(
+        "Supabase credentials not found! Please set SUPABASE_URL and SUPABASE_KEY in environment variables."
+    )
+
+# initialize Supabase client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @tool
-async def query_classrooms_basic(
+def query_classrooms_basic(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
     group_learning: bool = False,
@@ -29,48 +42,40 @@ async def query_classrooms_basic(
         A formatted string with classroom results
     """
     try:
-        # Build query parameters
-        params = {
-            "limit": 50
-        }
+        # Build Supabase query
+        query = supabase.table("Classroom").select("*")
         
+        # Apply filters
         if seminar_setup:
-            params["seminarSetup"] = "true"
+            query = query.eq("seminarSetup", True)
         if lecture_setup:
-            params["lectureSetup"] = "true"
+            query = query.eq("lectureSetup", True)
         if group_learning:
-            params["groupLearning"] = "true"
+            query = query.eq("groupLearning", True)
         if class_size:
-            params["minSeats"] = max(1, class_size - 5)
-            params["maxSeats"] = class_size + 10
-            
-        # Call backend classroom service
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{BACKEND_URL}/api/classrooms",
-                params=params,
-                timeout=10.0
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            classrooms = data.get("data", [])
-            
-            if not classrooms:
-                return "No classrooms found matching the basic criteria. Try adjusting the requirements."
-            
-            # Format results for LLM
-            result_text = f"Found {len(classrooms)} classrooms:\n\n"
-            for classroom in classrooms[:10]:  # Show top 10
-                result_text += f"- {classroom['building']} {classroom['room']}: {classroom['seatCount']} seats\n"
-            
-            return result_text
-            
+            min_seats = max(1, class_size - 5)
+            max_seats = class_size + 10
+            query = query.gte("seatCount", min_seats).lte("seatCount", max_seats)
+        
+        # Execute query with limit
+        response = query.limit(50).execute()
+        classrooms = response.data
+        
+        if not classrooms:
+            return "No classrooms found matching the basic criteria. Try adjusting the requirements."
+        
+        # Format results for LLM
+        result_text = f"Found {len(classrooms)} classrooms:\n\n"
+        for classroom in classrooms[:10]:  # Show top 10
+            result_text += f"- {classroom['building']} {classroom['room']}: {classroom['seatCount']} seats\n"
+        
+        return result_text
+        
     except Exception as e:
         return f"Error querying classrooms: {str(e)}"
 
 @tool
-async def query_classrooms_with_amenities(
+def query_classrooms_with_amenities(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
     group_learning: bool = False,
@@ -124,76 +129,71 @@ async def query_classrooms_with_amenities(
         A formatted string with detailed classroom results
     """
     try:
-        # Build query parameters with all filters
-        params = {"limit": 3}
+        # Build Supabase query
+        query = supabase.table("Classroom").select("*")
         
         # Essential criteria
         if seminar_setup:
-            params["seminarSetup"] = "true"
+            query = query.eq("seminarSetup", True)
         if lecture_setup:
-            params["lectureSetup"] = "true"
+            query = query.eq("lectureSetup", True)
         if group_learning:
-            params["groupLearning"] = "true"
+            query = query.eq("groupLearning", True)
         if class_size:
-            params["minSeats"] = max(1, class_size - 5)
-            params["maxSeats"] = class_size + 10
-            
-        # Amenities
+            min_seats = max(1, class_size - 5)
+            max_seats = class_size + 10
+            query = query.gte("seatCount", min_seats).lte("seatCount", max_seats)
+        
+        # Amenities - string fields
         if projection_surface:
-            params["projectionSurface"] = projection_surface
+            query = query.eq("projectionSurface", projection_surface)
         if computer:
-            params["computer"] = computer
+            query = query.eq("computer", computer)
         if microphone:
-            params["microphone"] = microphone
+            query = query.eq("microphone", microphone)
         if zoom_room:
-            params["zoomRoom"] = zoom_room
-        if classroom_capture is not None:
-            params["classroomCapture"] = str(classroom_capture).lower()
-        if group_learning_screens is not None:
-            params["groupLearningScreens"] = str(group_learning_screens).lower()
-        if white_board is not None:
-            params["whiteBoard"] = str(white_board).lower()
-        if chalk_board is not None:
-            params["chalkBoard"] = str(chalk_board).lower()
-        if dual_board_screen_use is not None:
-            params["dualBoardScreenUse"] = str(dual_board_screen_use).lower()
-        if group_learning_boards is not None:
-            params["groupLearningBoards"] = str(group_learning_boards).lower()
+            query = query.eq("zoomRoom", zoom_room)
         if teaching_station:
-            params["teachingStation"] = teaching_station
-        if windows is not None:
-            params["windows"] = str(windows).lower()
-        if ac is not None:
-            params["ac"] = str(ac).lower()
+            query = query.eq("teachingStation", teaching_station)
         if floor_type:
-            params["floorType"] = floor_type
+            query = query.eq("floorType", floor_type)
         if furniture:
-            params["furniture"] = furniture
+            query = query.eq("furniture", furniture)
+            
+        # Amenities - boolean fields
+        if classroom_capture is not None:
+            query = query.eq("classroomCapture", classroom_capture)
+        if group_learning_screens is not None:
+            query = query.eq("groupLearningScreens", group_learning_screens)
+        if white_board is not None:
+            query = query.eq("whiteBoard", white_board)
+        if chalk_board is not None:
+            query = query.eq("chalkBoard", chalk_board)
+        if dual_board_screen_use is not None:
+            query = query.eq("dualBoardScreenUse", dual_board_screen_use)
+        if group_learning_boards is not None:
+            query = query.eq("groupLearningBoards", group_learning_boards)
+        if windows is not None:
+            query = query.eq("windows", windows)
+        if ac is not None:
+            query = query.eq("ac", ac)
         if film_screening is not None:
-            params["filmScreening"] = str(film_screening).lower()
-            
-        # Call backend classroom service
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{BACKEND_URL}/api/classrooms",
-                params=params,
-                timeout=10.0
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            classrooms = data.get("data", [])
-            
-            if not classrooms:
-                return "No classrooms found matching all the specified amenities. Consider relaxing some requirements."
-            
-            # Format detailed results
-            result_text = f"Found {len(classrooms)} classroom(s) with your amenities:\n\n"
-            for classroom in classrooms:
-                result_text += f"- {classroom['building']} {classroom['room']}: {classroom['seatCount']} seats\n"
-            
-            return result_text
-            
+            query = query.eq("filmScreening", film_screening)
+        
+        # Execute query with limit
+        response = query.limit(3).execute()
+        classrooms = response.data
+        
+        if not classrooms:
+            return "No classrooms found matching all the specified amenities. Consider relaxing some requirements."
+        
+        # Format detailed results
+        result_text = f"Found {len(classrooms)} classroom(s) with your amenities:\n\n"
+        for classroom in classrooms:
+            result_text += f"- {classroom['building']} {classroom['room']}: {classroom['seatCount']} seats\n"
+        
+        return result_text
+        
     except Exception as e:
         return f"Error querying classrooms with amenities: {str(e)}"
 
