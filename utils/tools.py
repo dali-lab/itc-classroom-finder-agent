@@ -1,23 +1,7 @@
 from langchain_core.tools import tool
 from typing import Optional, List, Dict, Any
-from supabase import create_client, Client
-import os
-from dotenv import load_dotenv
+from utils.db import get_db_connection
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Supabase Configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError(
-        "Supabase credentials not found! Please set SUPABASE_URL and SUPABASE_KEY in environment variables."
-    )
-
-# initialize Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @tool
 def query_classrooms_basic(
@@ -42,24 +26,32 @@ def query_classrooms_basic(
         A formatted string with classroom results
     """
     try:
-        # Build Supabase query
-        query = supabase.table("Classroom").select("*")
+        # Build SQL query
+        conditions = []
+        params = []
         
-        # Apply filters
         if seminar_setup:
-            query = query.eq("seminarSetup", True)
+            conditions.append('"seminarSetup" = %s')
+            params.append(True)
         if lecture_setup:
-            query = query.eq("lectureSetup", True)
+            conditions.append('"lectureSetup" = %s')
+            params.append(True)
         if group_learning:
-            query = query.eq("groupLearning", True)
+            conditions.append('"groupLearning" = %s')
+            params.append(True)
         if class_size:
-            min_seats = max(1, class_size - 5)
-            max_seats = class_size + 10
-            query = query.gte("seatCount", min_seats).lte("seatCount", max_seats)
+            conditions.append('"seatCount" >= %s AND "seatCount" <= %s')
+            params.extend([max(1, class_size - 5), class_size + 10])
         
-        # Execute query with limit
-        response = query.limit(50).execute()
-        classrooms = response.data
+        query = 'SELECT * FROM "Classroom"'
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " LIMIT 50"
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                classrooms = cur.fetchall()
         
         if not classrooms:
             return "No classrooms found matching the basic criteria. Try adjusting the requirements."
@@ -73,6 +65,7 @@ def query_classrooms_basic(
         
     except Exception as e:
         return f"Error querying classrooms: {str(e)}"
+
 
 @tool
 def query_classrooms_with_amenities(
@@ -129,60 +122,85 @@ def query_classrooms_with_amenities(
         A formatted string with detailed classroom results
     """
     try:
-        # Build Supabase query
-        query = supabase.table("Classroom").select("*")
+        # Build SQL query
+        conditions = []
+        params = []
         
         # Essential criteria
         if seminar_setup:
-            query = query.eq("seminarSetup", True)
+            conditions.append('"seminarSetup" = %s')
+            params.append(True)
         if lecture_setup:
-            query = query.eq("lectureSetup", True)
+            conditions.append('"lectureSetup" = %s')
+            params.append(True)
         if group_learning:
-            query = query.eq("groupLearning", True)
+            conditions.append('"groupLearning" = %s')
+            params.append(True)
         if class_size:
-            min_seats = max(1, class_size - 5)
-            max_seats = class_size + 10
-            query = query.gte("seatCount", min_seats).lte("seatCount", max_seats)
+            conditions.append('"seatCount" >= %s AND "seatCount" <= %s')
+            params.extend([max(1, class_size - 5), class_size + 10])
         
         # Amenities - string fields
         if projection_surface:
-            query = query.eq("projectionSurface", projection_surface)
+            conditions.append('"projectionSurface" = %s')
+            params.append(projection_surface)
         if computer:
-            query = query.eq("computer", computer)
+            conditions.append('"computer" = %s')
+            params.append(computer)
         if microphone:
-            query = query.eq("microphone", microphone)
+            conditions.append('"microphone" = %s')
+            params.append(microphone)
         if zoom_room:
-            query = query.eq("zoomRoom", zoom_room)
+            conditions.append('"zoomRoom" = %s')
+            params.append(zoom_room)
         if teaching_station:
-            query = query.eq("teachingStation", teaching_station)
+            conditions.append('"teachingStation" = %s')
+            params.append(teaching_station)
         if floor_type:
-            query = query.eq("floorType", floor_type)
+            conditions.append('"floorType" = %s')
+            params.append(floor_type)
         if furniture:
-            query = query.eq("furniture", furniture)
+            conditions.append('"furniture" = %s')
+            params.append(furniture)
             
         # Amenities - boolean fields
         if classroom_capture is not None:
-            query = query.eq("classroomCapture", classroom_capture)
+            conditions.append('"classroomCapture" = %s')
+            params.append(classroom_capture)
         if group_learning_screens is not None:
-            query = query.eq("groupLearningScreens", group_learning_screens)
+            conditions.append('"groupLearningScreens" = %s')
+            params.append(group_learning_screens)
         if white_board is not None:
-            query = query.eq("whiteBoard", white_board)
+            conditions.append('"whiteBoard" = %s')
+            params.append(white_board)
         if chalk_board is not None:
-            query = query.eq("chalkBoard", chalk_board)
+            conditions.append('"chalkBoard" = %s')
+            params.append(chalk_board)
         if dual_board_screen_use is not None:
-            query = query.eq("dualBoardScreenUse", dual_board_screen_use)
+            conditions.append('"dualBoardScreenUse" = %s')
+            params.append(dual_board_screen_use)
         if group_learning_boards is not None:
-            query = query.eq("groupLearningBoards", group_learning_boards)
+            conditions.append('"groupLearningBoards" = %s')
+            params.append(group_learning_boards)
         if windows is not None:
-            query = query.eq("windows", windows)
+            conditions.append('"windows" = %s')
+            params.append(windows)
         if ac is not None:
-            query = query.eq("ac", ac)
+            conditions.append('"ac" = %s')
+            params.append(ac)
         if film_screening is not None:
-            query = query.eq("filmScreening", film_screening)
+            conditions.append('"filmScreening" = %s')
+            params.append(film_screening)
         
-        # Execute query with limit
-        response = query.limit(3).execute()
-        classrooms = response.data
+        query = 'SELECT * FROM "Classroom"'
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " LIMIT 3"
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                classrooms = cur.fetchall()
         
         if not classrooms:
             return "No classrooms found matching all the specified amenities. Consider relaxing some requirements."
@@ -196,5 +214,6 @@ def query_classrooms_with_amenities(
         
     except Exception as e:
         return f"Error querying classrooms with amenities: {str(e)}"
+
 
 tools = [query_classrooms_basic, query_classrooms_with_amenities]
