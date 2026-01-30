@@ -10,4 +10,4 @@ fastapi
 uvicorn
 pydantic
 httpx
-supabase
+psycopg2-binary
