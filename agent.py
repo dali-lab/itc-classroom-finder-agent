@@ -1,6 +1,6 @@
 import uuid
 
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from utils.model import model
 from utils.tools import tools
 
@@ -25,13 +25,14 @@ Do not make assumptions - always confirm requirements with the user first.
 When presenting results, describe them in a helpful way and offer to search again with different criteria if needed.
 """
 
-workflow = create_react_agent(
+workflow = create_agent(
     model, 
     tools=tools,
 )
 
-async def chat():
+def chat():
     thread_id = str(uuid.uuid4())
+    print("Classroom Finder Agent - Type 'quit' or 'exit' to end\n")
     while True:
         user_input = input("User: ").strip()
 
@@ -57,3 +58,8 @@ async def chat():
 
         except Exception as e:
             print(f"\nError: {e}\n")
+
+
+if __name__ == "__main__":
+    chat()
+
