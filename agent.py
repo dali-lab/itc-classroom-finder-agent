@@ -22,12 +22,21 @@ ask about those amenities and then use the query_classrooms_with_amenities tool.
 Be friendly, concise, and guide the conversation naturally.
 Do not make assumptions - always confirm requirements with the user first.
 
-When presenting results, describe them in a helpful way and offer to search again with different criteria if needed.
+IMPORTANT rules for presenting classroom results:
+- The classroom data is displayed to the user as interactive UI cards automatically. Do NOT repeat classroom details (names, buildings, seat counts, tables, etc.) in your text response.
+- After a successful query, write a short conversational summary like "I found 8 classrooms that match your criteria." and offer to refine the search or answer questions.
+- Never list classrooms in a table, bullet list, or any other text format. The UI handles that.
+
+IMPORTANT rules for location/distance tools:
+- When using validate_address or get_distance, always use full building names with "Hanover, NH 03755" (e.g. "Cummings Hall, Hanover, NH 03755").
+- If a location lookup fails, do NOT keep retrying with different name variations. After at most 2 attempts, tell the user the address could not be found and ask them to provide a street address.
+- Never make more than 3 total tool calls for a single address lookup.
 """
 
 workflow = create_agent(
-    model, 
+    model,
     tools=tools,
+    system_prompt=system_prompt,
 )
 
 def chat():
@@ -51,6 +60,19 @@ def chat():
 
             # Extract and print the agent's response
             if response and "messages" in response:
+                # Log tool calls and tool results
+                for msg in response["messages"]:
+                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                        for tc in msg.tool_calls:
+                            print(f"\n--- TOOL CALL ---")
+                            print(f"  Tool: {tc['name']}")
+                            print(f"  Input: {tc['args']}")
+                    if msg.type == "tool":
+                        print(f"--- TOOL RESULT ---")
+                        print(f"  Tool: {msg.name}")
+                        print(f"  Output: {msg.content}")
+                        print(f"-----------------")
+
                 last_message = response["messages"][-1]
                 print(f"\nAgent: {last_message.content}\n")
             else:

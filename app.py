@@ -65,17 +65,36 @@ async def chat_endpoint(
         # Extract response
         if response and "messages" in response:
             last_message = response["messages"][-1]
-            
+
+            # Log all messages for debugging
+            print(f"\n{'='*60}")
+            print(f"[DEBUG] Total messages: {len(response['messages'])}")
+            for i, msg in enumerate(response["messages"]):
+                print(f"\n[DEBUG] Message {i}: type={msg.type}")
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        print(f"  [TOOL CALL] {tc['name']}({tc['args']})")
+                if msg.type == "tool":
+                    print(f"  [TOOL RESULT] name={msg.name}")
+                    print(f"  [TOOL RESULT] content={msg.content[:300]}")
+                    print(f"  [TOOL RESULT] artifact type={type(msg.artifact)}, value={msg.artifact}")
+                if msg.type == "ai":
+                    print(f"  [AI] content={msg.content[:200]}")
+            print(f"{'='*60}\n")
+
             # Check if tool was called by inspecting message history
             tool_called = any(
-                hasattr(msg, "tool_calls") and msg.tool_calls 
+                hasattr(msg, "tool_calls") and msg.tool_calls
                 for msg in response["messages"]
             )
-            
-            # Extract classroom data if available
+
+            # Extract classroom data from tool message artifacts
             classrooms = None
-            if hasattr(last_message, "artifact") and last_message.artifact:
-                classrooms = last_message.artifact
+            for msg in reversed(response["messages"]):
+                if msg.type == "tool" and hasattr(msg, "artifact") and msg.artifact:
+                    classrooms = msg.artifact
+                    print(f"[DEBUG] Extracted {len(classrooms)} classrooms from '{msg.name}' artifact")
+                    break
             
             return ChatResponse(
                 message=last_message.content,
