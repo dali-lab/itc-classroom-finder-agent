@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 .langgraph_api/
 venv/
+*.log

@@ -1,0 +1,204 @@
+contacts:
+  - name: "Registrar's Office"
+    email: "Registrar@Dartmouth.edu"
+    phone: "603-646-2246"
+    website: null
+    description: "Contact the Registrar's Office for scheduling, bookings, accessibility, and administrative matters."
+    keywords:
+      # Scheduling & Booking
+      - "book"
+      - "booking"
+      - "reserve"
+      - "reservation"
+      - "schedule"
+      - "scheduling"
+      - "available"
+      - "availability"
+      - "move class"
+      - "change room"
+      - "request room"
+      - "request classroom"
+      - "request a"
+      - "request"
+      - "different classroom"
+      - "reassign"
+      
+      # Specific Cases
+      - "thayer classroom"
+      - "thayer"
+      - "non-engs"
+      - "non-cosc"
+      - "historical data"
+      - "last year"
+      - "where was my class"
+      
+      # Accessibility
+      - "accessibility"
+      - "disability"
+      - "accommodation"
+      - "accessible"
+      
+      # Timetable & Course Planning
+      - "timetable editor"
+      - "timetable"
+      - "deadline"
+      - "course planning"
+      - "add course"
+      - "new course"
+      - "change time period"
+      - "time period"
+      
+      # Exams
+      - "final exam"
+      - "exam scheduling"
+      - "finals"
+      
+      # Furniture
+      - "furniture"
+      - "extra furniture"
+      - "add chair"
+      - "add table"
+      - "podium"
+      - "deliver"
+    
+  - name: "Classroom Technology Services"
+    email: "Classroom.Technology.Services@Dartmouth.edu"
+    phone: "603-646-2999"
+    website: "https://services.dartmouth.edu/TDClient/1806/Portal/Requests/ServiceDet?ID=38206"
+    description: "Contact Classroom Technology Services for questions about classroom technology, equipment, and training."
+    keywords:
+      # Technology
+      - "technology"
+      - "tech"
+      - "projector"
+      - "projection"
+      - "screen"
+      - "computer"
+      - "zoom"
+      - "zoom room"
+      - "microphone"
+      - "audio"
+      - "video"
+      - "av"
+      - "audiovisual"
+      - "equipment"
+      
+      # Setup & Training
+      - "setup"
+      - "set up"
+      - "training"
+      - "how to use"
+      - "learn"
+      - "teach me"
+      - "compatible"
+      - "compatibility"
+      
+      # Quality & Specs
+      - "quality"
+      - "specs"
+      - "specifications"
+      - "resolution"
+      - "hdmi"
+      - "cable"
+      - "connection"
+      
+      # Specific Tech
+      - "classroom capture"
+      - "recording"
+      - "lecture capture"
+      - "dual projector"
+      - "dual screen"
+      
+  - name: "ITC Dartmouth (Information Technology & Consulting)"
+    email: "itc@dartmouth.edu"
+    phone: "603-646-2999"
+    phone_tollfree: "1-855-764-2485"
+    website: null
+    hours: "Monday through Friday, 8:00 a.m. to 5:00 p.m. (ET)"
+    description: "Contact ITC for assistance with technology at Dartmouth. Whether you're troubleshooting a classroom projector, managing accounts and passwords, setting up software, or having issues with the Classroom Finder tool, ITC support staff can help. For urgent classroom or system outages, phone support is recommended for the fastest response."
+    keywords:
+      # Classroom Finder Tool
+      - "classroom finder"
+      - "this tool"
+      - "this website"
+      - "this app"
+      - "this site"
+      - "finder"
+      - "how to use finder"
+      - "tool help"
+      - "tool support"
+      - "website issue"
+      - "app issue"
+      - "site issue"
+      
+      # Technical Issues
+      - "bug"
+      - "error"
+      - "not working"
+      - "broken"
+      - "crash"
+      - "problem"
+      
+      # Account & Access
+      - "login"
+      - "log in"
+      - "sign in"
+      - "account"
+      - "password"
+      - "reset password"
+      - "forgot password"
+      - "access"
+      - "can't access"
+      
+      # General IT Support
+      - "software"
+      - "troubleshoot"
+      - "system outage"
+      - "outage"
+      - "urgent"
+      - "help"
+      - "support"
+      - "technical support"
+      - "it support"
+      - "tech support"
+      
+  - name: "Transportation Services"
+    email: "Transportation.Services@Dartmouth.edu"
+    phone: "603-646-2340"
+    website: "https://operations.dartmouth.edu/transportation-parking"
+    description: "Contact Transportation Services for parking, permits, and accessible parking questions. These questions can also be directed to the Registrar for simplicity."
+    keywords:
+      - "parking"
+      - "park"
+      - "parking lot"
+      - "permit"
+      - "accessible parking"
+      - "parking map"
+      - "how to get there"
+      - "transportation"
+      - "distance"
+      - "walking distance"
+      - "drive"
+      - "driving"
+
+# Special routing rules for complex cases
+routing_rules:
+  - condition: "booking or availability question"
+    contact: "Registrar's Office"
+    note: "All booking and availability questions go to Registrar"
+    
+  - condition: "technology or equipment question"
+    contact: "Classroom Technology Services"
+    note: "Technology specs and training questions"
+    
+  - condition: "accessibility or disability"
+    contact: "Registrar's Office"
+    note: "Accessibility accommodations handled by Registrar"
+    
+  - condition: "furniture requests"
+    contact: "Registrar's Office"
+    note: "Furniture delivery and changes handled by Registrar"
+    
+  - condition: "classroom finder tool issues"
+    contact: "ITC (Information Technology & Consulting)"
+    note: "Tool-specific issues go to ITC"
