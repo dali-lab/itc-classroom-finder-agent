@@ -4,21 +4,58 @@ Handles basic and advanced classroom queries with various filters and amenities.
 """
 
 from langchain_core.tools import tool
-from typing import Optional
+from typing import Optional, Tuple, Any, List
 from ..db import get_db_connection
 
 
-@tool
+def _rows_to_dicts(classrooms) -> List[dict]:
+    """Convert RealDictRow objects to plain dicts."""
+    return [dict(row) for row in classrooms]
+
+
+def _format_classrooms_for_llm(classroom_dicts: List[dict]) -> str:
+    """Format classroom dicts into a concise text summary the LLM can reference."""
+    lines = []
+    for c in classroom_dicts:
+        features = []
+        if c.get('seminarSetup'):
+            features.append('seminar')
+        if c.get('lectureSetup'):
+            features.append('lecture')
+        if c.get('groupLearning'):
+            features.append('group learning')
+        if c.get('projectionSurface'):
+            features.append(f"projection: {c['projectionSurface']}")
+        if c.get('whiteBoard'):
+            features.append('whiteboard')
+        if c.get('chalkBoard'):
+            features.append('chalkboard')
+        if c.get('zoomRoom'):
+            features.append(f"Zoom: {c['zoomRoom']}")
+        if c.get('classroomCapture'):
+            features.append('classroom capture')
+        if c.get('ac'):
+            features.append('AC')
+        feat_str = ', '.join(features) if features else 'no special features listed'
+        lines.append(
+            f"- {c.get('building', '?')} {c.get('room', '?')}: "
+            f"{c.get('seatCount', '?')} seats | {feat_str}"
+        )
+    return '\n'.join(lines)
+
+
+@tool(response_format="content_and_artifact")
 def query_classrooms_basic(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
     group_learning: bool = False,
     class_size: Optional[int] = None,
     department_name: Optional[str] = None
-) -> str:
+) -> Tuple[str, Any]:
     """
     Query classrooms based on essential criteria: class style (seminar, lecture, or group learning) and class size.
     Use this tool when you have collected the basic requirements from the user.
+    ALWAYS use this tool when the user asks to find or see classrooms — do not just describe them in text.
     
     Args:
         seminar_setup: Whether the classroom should support seminar-style teaching
@@ -28,7 +65,7 @@ def query_classrooms_basic(
         department_name: The department name for context (optional)
     
     Returns:
-        A formatted string with classroom results
+        A tuple of (summary text, list of classroom dicts)
     """
     try:
         # Build SQL query
@@ -45,34 +82,92 @@ def query_classrooms_basic(
             conditions.append('"groupLearning" = %s')
             params.append(True)
         if class_size:
-            conditions.append('"seatCount" >= %s AND "seatCount" <= %s')
-            params.extend([max(1, class_size - 5), class_size + 10])
+            # Any room that fits at least class_size students works — no upper bound
+            conditions.append('"seatCount" >= %s')
+            params.append(class_size)
         
         query = 'SELECT * FROM "Classroom"'
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " LIMIT 50"
+        query += " ORDER BY "
+        # If a target size was given, prefer rooms closest to it (smallest adequate room first)
+        if class_size:
+            query += '"seatCount" ASC'
+        else:
+            query += '"building" ASC, "room" ASC'
+        query += " LIMIT 9"
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, params)
                 classrooms = cur.fetchall()
         
+        # If no results with style+size filters, retry dropping the style constraint
+        if not classrooms and class_size and (seminar_setup or lecture_setup or group_learning):
+            fallback_query = 'SELECT * FROM "Classroom" WHERE "seatCount" >= %s ORDER BY "seatCount" ASC LIMIT 9'
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(fallback_query, [class_size])
+                    classrooms = cur.fetchall()
+            if classrooms:
+                classroom_dicts = _rows_to_dicts(classrooms)
+                summary = _format_classrooms_for_llm(classroom_dicts)
+                return (
+                    f"No classrooms matched the exact style filter, but found {len(classroom_dicts)} room(s) with at least {class_size} seats. "
+                    f"These are the REAL results — base your response ONLY on this data, do NOT invent or add other classrooms:\n{summary}\n"
+                    "The classroom cards are shown in the UI. Tell the user no exact style match was found but here are the closest-fitting options, then offer to refine.",
+                    classroom_dicts
+                )
+
+        # If still no results, retry with only the style filter (drop size)
+        if not classrooms and (seminar_setup or lecture_setup or group_learning):
+            style_conditions = []
+            style_params = []
+            if seminar_setup:
+                style_conditions.append('"seminarSetup" = %s')
+                style_params.append(True)
+            if lecture_setup:
+                style_conditions.append('"lectureSetup" = %s')
+                style_params.append(True)
+            if group_learning:
+                style_conditions.append('"groupLearning" = %s')
+                style_params.append(True)
+            fallback_query = 'SELECT * FROM "Classroom" WHERE ' + ' AND '.join(style_conditions) + ' ORDER BY "seatCount" ASC LIMIT 9'
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(fallback_query, style_params)
+                    classrooms = cur.fetchall()
+            if classrooms:
+                classroom_dicts = _rows_to_dicts(classrooms)
+                summary = _format_classrooms_for_llm(classroom_dicts)
+                return (
+                    f"No classrooms matched all criteria, but found {len(classroom_dicts)} room(s) with the requested style. "
+                    f"These are the REAL results — base your response ONLY on this data:\n{summary}\n"
+                    "The classroom cards are shown in the UI. Tell the user these are the closest matches and offer to refine.",
+                    classroom_dicts
+                )
+
         if not classrooms:
-            return "No classrooms found matching the basic criteria. Try adjusting the requirements."
+            return (
+                "No classrooms found even after relaxing the filters. Inform the user no results were found and ask them to try different criteria (e.g. different style or size). Do NOT route to contacts.",
+                []
+            )
         
-        # Format results for LLM
-        result_text = f"Found {len(classrooms)} classrooms:\n\n"
-        for classroom in classrooms[:10]:  # Show top 10
-            result_text += f"- {classroom['building']} {classroom['room']}: {classroom['seatCount']} seats\n"
-        
-        return result_text
+        classroom_dicts = _rows_to_dicts(classrooms)
+        summary = _format_classrooms_for_llm(classroom_dicts)
+        result_text = (
+            f"Found {len(classroom_dicts)} classroom(s) matching the criteria. "
+            f"These are the REAL results — base your response ONLY on this data, do NOT invent or add other classrooms:\n{summary}\n"
+            "The classroom cards are already shown to the user in the UI. "
+            "Write a SHORT 1-2 sentence summary referencing these specific rooms (building + room number), then offer to refine."
+        )
+        return (result_text, classroom_dicts)
         
     except Exception as e:
-        return f"Error querying classrooms: {str(e)}"
+        return (f"Error querying classrooms: {str(e)}", [])
 
 
-@tool
+@tool(response_format="content_and_artifact")
 def query_classrooms_with_amenities(
     seminar_setup: bool = False,
     lecture_setup: bool = False,
@@ -95,10 +190,11 @@ def query_classrooms_with_amenities(
     floor_type: Optional[str] = None,
     furniture: Optional[str] = None,
     film_screening: Optional[bool] = None
-) -> str:
+) -> Tuple[str, Any]:
     """
     Query classrooms with specific amenities and features.
     Use this tool when the user has specified detailed requirements beyond just class style and size.
+    ALWAYS use this tool when the user asks to find or see classrooms — do not just describe them in text.
     
     Args:
         seminar_setup: Supports seminar-style teaching
@@ -124,7 +220,7 @@ def query_classrooms_with_amenities(
         film_screening: Supports film screening
     
     Returns:
-        A formatted string with detailed classroom results
+        A tuple of (summary text, list of classroom dicts)
     """
     try:
         # Build SQL query
@@ -142,8 +238,9 @@ def query_classrooms_with_amenities(
             conditions.append('"groupLearning" = %s')
             params.append(True)
         if class_size:
-            conditions.append('"seatCount" >= %s AND "seatCount" <= %s')
-            params.extend([max(1, class_size - 5), class_size + 10])
+            # Any room that fits at least class_size students works — no upper bound
+            conditions.append('"seatCount" >= %s')
+            params.append(class_size)
         
         # Amenities - string fields
         if projection_surface:
@@ -200,22 +297,92 @@ def query_classrooms_with_amenities(
         query = 'SELECT * FROM "Classroom"'
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " LIMIT 3"
+        query += " ORDER BY " + ('"seatCount" ASC' if class_size else '"building" ASC, "room" ASC')
+        query += " LIMIT 9"
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, params)
                 classrooms = cur.fetchall()
-        
+
+        # If no results, progressively relax constraints and retry
         if not classrooms:
-            return "No classrooms found matching all the specified amenities. Consider relaxing some requirements."
+            # Drop amenity filters but keep style + size
+            relaxed_conditions = []
+            relaxed_params = []
+            if seminar_setup:
+                relaxed_conditions.append('"seminarSetup" = %s')
+                relaxed_params.append(True)
+            if lecture_setup:
+                relaxed_conditions.append('"lectureSetup" = %s')
+                relaxed_params.append(True)
+            if group_learning:
+                relaxed_conditions.append('"groupLearning" = %s')
+                relaxed_params.append(True)
+            if class_size:
+                relaxed_conditions.append('"seatCount" >= %s')
+                relaxed_params.append(class_size)
+            fallback_query = 'SELECT * FROM "Classroom"'
+            if relaxed_conditions:
+                fallback_query += " WHERE " + " AND ".join(relaxed_conditions)
+            fallback_query += " ORDER BY " + ('"seatCount" ASC' if class_size else '"building" ASC') + " LIMIT 9"
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(fallback_query, relaxed_params)
+                    classrooms = cur.fetchall()
+            if classrooms:
+                classroom_dicts = _rows_to_dicts(classrooms)
+                summary = _format_classrooms_for_llm(classroom_dicts)
+                return (
+                    f"No classrooms matched all amenity requirements, but found {len(classroom_dicts)} room(s) matching style/size. "
+                    f"These are the REAL results — base your response ONLY on this data:\n{summary}\n"
+                    "Cards are shown in the UI. Tell the user some amenity filters were relaxed and these are the best matches, then offer to refine.",
+                    classroom_dicts
+                )
+
+        # If still nothing, drop size too and just match style
+        if not classrooms and (seminar_setup or lecture_setup or group_learning):
+            style_conditions = []
+            style_params = []
+            if seminar_setup:
+                style_conditions.append('"seminarSetup" = %s')
+                style_params.append(True)
+            if lecture_setup:
+                style_conditions.append('"lectureSetup" = %s')
+                style_params.append(True)
+            if group_learning:
+                style_conditions.append('"groupLearning" = %s')
+                style_params.append(True)
+            fallback_query = 'SELECT * FROM "Classroom" WHERE ' + ' AND '.join(style_conditions) + ' ORDER BY "seatCount" ASC LIMIT 9'
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(fallback_query, style_params)
+                    classrooms = cur.fetchall()
+            if classrooms:
+                classroom_dicts = _rows_to_dicts(classrooms)
+                summary = _format_classrooms_for_llm(classroom_dicts)
+                return (
+                    f"No exact match found, but here are {len(classroom_dicts)} room(s) with the requested style. "
+                    f"These are the REAL results:\n{summary}\n"
+                    "Cards are shown in the UI. Tell the user these are the closest available options and offer to refine.",
+                    classroom_dicts
+                )
+
+        if not classrooms:
+            return (
+                "No classrooms found even after relaxing all filters. Inform the user and ask them to try different criteria. Do NOT route to contacts.",
+                []
+            )
         
-        # Format detailed results
-        result_text = f"Found {len(classrooms)} classroom(s) with your amenities:\n\n"
-        for classroom in classrooms:
-            result_text += f"- {classroom['building']} {classroom['room']}: {classroom['seatCount']} seats\n"
-        
-        return result_text
+        classroom_dicts = _rows_to_dicts(classrooms)
+        summary = _format_classrooms_for_llm(classroom_dicts)
+        result_text = (
+            f"Found {len(classroom_dicts)} classroom(s) matching all specified amenities. "
+            f"These are the REAL results — base your response ONLY on this data, do NOT invent or add other classrooms:\n{summary}\n"
+            "The classroom cards are already shown to the user in the UI. "
+            "Write a SHORT 1-2 sentence summary referencing these specific rooms (building + room number), then offer to refine."
+        )
+        return (result_text, classroom_dicts)
         
     except Exception as e:
-        return f"Error querying classrooms with amenities: {str(e)}"
+        return (f"Error querying classrooms with amenities: {str(e)}", [])

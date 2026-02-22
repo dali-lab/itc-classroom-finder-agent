@@ -56,8 +56,8 @@ async def chat_endpoint(
             for msg in request.messages
         ]
         
-        # Invoke agent workflow
-        response = workflow.invoke(
+        # Invoke agent workflow (async to support async tools)
+        response = await workflow.ainvoke(
             {"messages": messages},
             config={"configurable": {"thread_id": thread_id}}
         )
@@ -72,10 +72,15 @@ async def chat_endpoint(
                 for msg in response["messages"]
             )
             
-            # Extract classroom data if available
+            # Extract classroom data from ToolMessage artifacts
+            # When tools use response_format="content_and_artifact", the artifact
+            # is stored on the ToolMessage (not the final AIMessage).
             classrooms = None
-            if hasattr(last_message, "artifact") and last_message.artifact:
-                classrooms = last_message.artifact
+            for msg in response["messages"]:
+                if hasattr(msg, "artifact") and isinstance(msg.artifact, list) and len(msg.artifact) > 0:
+                    # Only use classroom artifacts (dicts with 'id' and 'building' keys)
+                    if isinstance(msg.artifact[0], dict) and "building" in msg.artifact[0]:
+                        classrooms = msg.artifact
             
             return ChatResponse(
                 message=last_message.content,

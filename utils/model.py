@@ -1,24 +1,16 @@
-from langchain_openai import ChatOpenAI
-from dotenv import load_dotenv
-from langchain.agents.middleware import wrap_model_call, ModelRequest, ModelResponse
 from langchain_dartmouth.llms import ChatDartmouth
-
+from dotenv import load_dotenv
 import os
 
-
 load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
-dartmouth_api_key = os.getenv("DARTMOUTH_API_KEY")
 
-if not dartmouth_api_key:
+dartmouth_chat_api_key = os.getenv("DARTMOUTH_CHAT_API_KEY")
+
+if not dartmouth_chat_api_key:
     raise ValueError(
-        "API key not found! Please set DARTMOUTH_API_KEY environment variable."
+        "API key not found! Please set DARTMOUTH_CHAT_API_KEY environment variable."
     )
 
-
-# model = ChatOpenAI(
-#     model="gpt-5",
-#     api_key=dartmouth_chat_api_key
-# )
-
-model = ChatDartmouth(dartmouth_chat_api_key=dartmouth_api_key)
+model = ChatDartmouth(
+    dartmouth_chat_api_key=dartmouth_chat_api_key
+)
