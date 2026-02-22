@@ -84,16 +84,16 @@ def format_contact_info(contact: Dict[str, Any], include_description: bool = Tru
     
     contact_details = []
     if contact.get('email'):
-        contact_details.append(f"📧 Email: {contact['email']}")
+        contact_details.append(f"Email: {contact['email']}")
     if contact.get('phone'):
-        phone_text = f"📞 Phone: {contact['phone']}"
+        phone_text = f"Phone: {contact['phone']}"
         if contact.get('phone_tollfree'):
             phone_text += f" or {contact['phone_tollfree']} (toll-free)"
         contact_details.append(phone_text)
     if contact.get('website'):
-        contact_details.append(f"🌐 Website: {contact['website']}")
+        contact_details.append(f"Website: {contact['website']}")
     if contact.get('hours'):
-        contact_details.append(f"🕒 Hours: {contact['hours']}")
+        contact_details.append(f"Hours: {contact['hours']}")
     
     if contact_details:
         parts.append("\n".join(contact_details))
@@ -119,18 +119,18 @@ def get_contact_information_helper(query: str) -> str:
         return """I couldn't determine a specific contact for your question. Here are the main resources:
 
 **For booking or scheduling questions:** Contact the Registrar's Office
-📧 Email: Registrar@Dartmouth.edu
-📞 Phone: 603-646-2246
+Email: Registrar@Dartmouth.edu
+Phone: 603-646-2246
 
 **For classroom technology or equipment questions:** Contact Classroom Technology Services
-📧 Email: Classroom.Technology.Services@Dartmouth.edu
-📞 Phone: 603-646-2999
-🌐 Website: https://services.dartmouth.edu/TDClient/1806/Portal/Requests/ServiceDet?ID=38206
+Email: Classroom.Technology.Services@Dartmouth.edu
+Phone: 603-646-2999
+Website: https://services.dartmouth.edu/TDClient/1806/Portal/Requests/ServiceDet?ID=38206
 
 **For questions about this Classroom Finder tool or general IT support:** Contact ITC Dartmouth
-📧 Email: itc@dartmouth.edu
-📞 Phone: 603-646-2999 or 1-855-764-2485 (toll-free)
-🕒 Hours: Monday through Friday, 8:00 a.m. to 5:00 p.m. (ET)
+Email: itc@dartmouth.edu
+Phone: 603-646-2999 or 1-855-764-2485 (toll-free)
+Hours: Monday through Friday, 8:00 a.m. to 5:00 p.m. (ET)
 
 If you'd like more specific contact information, please provide more details about your question."""
     
