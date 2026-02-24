@@ -1,13 +1,27 @@
 from fastapi import FastAPI, HTTPException, Header
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, AsyncGenerator
 import os
+import json
+from datetime import datetime
 from dotenv import load_dotenv
 from agent import workflow
 import uuid
 
 load_dotenv()
+
+def serialize_for_json(obj: Any) -> Any:
+    """Recursively serialize objects for JSON, converting datetime to ISO strings."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {key: serialize_for_json(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_for_json(item) for item in obj]
+    else:
+        return obj
 
 app = FastAPI(title="Classroom Finder Agent")
 
@@ -92,6 +106,85 @@ async def chat_endpoint(
             
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat/stream")
+async def chat_stream_endpoint(
+    request: ChatRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Streaming chat endpoint that processes messages using LangChain agent.
+    Returns Server-Sent Events (SSE) format.
+    """
+    try:
+        # Validate authorization header from backend
+        if not authorization:
+            raise HTTPException(status_code=401, detail="Authorization header required")
+        
+        # Generate unique thread ID for conversation
+        thread_id = str(uuid.uuid4())
+        
+        # Convert messages to LangChain format
+        messages = [
+            {"role": msg.role, "content": msg.content} 
+            for msg in request.messages
+        ]
+        
+        async def generate_stream() -> AsyncGenerator[str, None]:
+            """Generator function that yields SSE-formatted chunks"""
+            try:
+                import asyncio
+                classrooms = None
+                
+                # Get the agent's response (single invocation)
+                response = await workflow.ainvoke(
+                    {"messages": messages},
+                    config={"configurable": {"thread_id": thread_id}}
+                )
+                
+                if response and "messages" in response:
+                    last_message = response["messages"][-1]
+                    
+                    # Extract classroom artifacts
+                    for msg in response["messages"]:
+                        if hasattr(msg, "artifact") and isinstance(msg.artifact, list) and len(msg.artifact) > 0:
+                            if isinstance(msg.artifact[0], dict) and "building" in msg.artifact[0]:
+                                classrooms = msg.artifact
+                    
+                    # Stream the response text in chunks for better UX
+                    if hasattr(last_message, "content") and last_message.content:
+                        full_text = str(last_message.content)
+                        # Stream in word-sized chunks
+                        words = full_text.split(' ')
+                        for i, word in enumerate(words):
+                            chunk = word + (' ' if i < len(words) - 1 else '')
+                            yield f"data: {json.dumps({'text': chunk})}\n\n"
+                            # Small delay to make streaming visible
+                            await asyncio.sleep(0.02)
+                
+                # Send completion signal with classrooms (serialize datetime objects)
+                serialized_classrooms = serialize_for_json(classrooms) if classrooms else None
+                yield f"data: {json.dumps({'done': True, 'classrooms': serialized_classrooms})}\n\n"
+                
+            except Exception as e:
+                print(f"Error in stream generation: {e}")
+                import traceback
+                traceback.print_exc()
+                error_msg = json.dumps({"error": str(e)})
+                yield f"data: {error_msg}\n\n"
+        
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+            
+    except Exception as e:
+        print(f"Error in chat stream endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
