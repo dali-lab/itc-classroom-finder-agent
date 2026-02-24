@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import os
+import json
 from dotenv import load_dotenv
 from agent import workflow
 import uuid
@@ -93,6 +95,67 @@ async def chat_endpoint(
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat/stream")
+async def chat_stream(
+    request: ChatRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Streaming chat endpoint using Server-Sent Events.
+    Streams LLM tokens as they are generated, then emits a final done event with classrooms.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+
+    thread_id = str(uuid.uuid4())
+    messages = [
+        {"role": msg.role, "content": msg.content}
+        for msg in request.messages
+    ]
+
+    async def generate():
+        full_response = ""
+        classrooms = []
+        try:
+            async for event in workflow.astream_events(
+                {"messages": messages},
+                config={"configurable": {"thread_id": thread_id}},
+                version="v2",
+            ):
+                kind = event.get("event")
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"].get("chunk")
+                    if chunk and hasattr(chunk, "content") and chunk.content:
+                        text = chunk.content
+                        if isinstance(text, str) and text:
+                            full_response += text
+                            yield f"data: {json.dumps({'text': text})}\n\n"
+                elif kind == "on_chain_end" and event.get("name") == "LangGraph":  # debug: print name if classrooms are empty
+                    # Extract classrooms from the final graph output
+                    output = event.get("data", {}).get("output", {})
+                    final_messages = output.get("messages", [])
+                    for msg in final_messages:
+                        if hasattr(msg, "artifact") and msg.artifact:
+                            classrooms = msg.artifact
+                            break
+
+        except GeneratorExit:
+            return
+        except Exception as e:
+            print(f"Error during streaming: {e}")
+
+        yield f"data: {json.dumps({'done': True, 'classrooms': classrooms})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
 
 @app.get("/health")
 async def health_check():
