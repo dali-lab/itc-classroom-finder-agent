@@ -106,7 +106,19 @@ async def chat_endpoint(
             
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        traceback.print_exc()
+        
+        # Check if it's an API error (like 302 redirect or outage)
+        error_str = str(e)
+        if "302" in error_str or "outage" in error_str.lower() or "Moved Temporarily" in error_str:
+            user_friendly_error = "The AI service is currently unavailable. Please try again later."
+        elif "API" in error_str or "api" in error_str.lower():
+            user_friendly_error = "There was an issue connecting to the AI service. Please try again."
+        else:
+            user_friendly_error = "An error occurred while processing your request. Please try again."
+        
+        raise HTTPException(status_code=503, detail=user_friendly_error)
 
 @app.post("/chat/stream")
 async def chat_stream_endpoint(
@@ -171,7 +183,17 @@ async def chat_stream_endpoint(
                 print(f"Error in stream generation: {e}")
                 import traceback
                 traceback.print_exc()
-                error_msg = json.dumps({"error": str(e)})
+                
+                # Check if it's an API error (like 302 redirect or outage)
+                error_str = str(e)
+                if "302" in error_str or "outage" in error_str.lower() or "Moved Temporarily" in error_str:
+                    user_friendly_error = "The AI service is currently unavailable. Please try again later."
+                elif "API" in error_str or "api" in error_str.lower():
+                    user_friendly_error = "There was an issue connecting to the AI service. Please try again."
+                else:
+                    user_friendly_error = "An error occurred while processing your request. Please try again."
+                
+                error_msg = json.dumps({"error": user_friendly_error, "done": True})
                 yield f"data: {error_msg}\n\n"
         
         return StreamingResponse(
