@@ -4,11 +4,12 @@ Contains specialized modules for different tool categories.
 """
 
 from .location import validate_address, get_distance, sort_classrooms_by_distance
-from .queries import query_classrooms_basic, query_classrooms_with_amenities
+from .queries import query_classrooms_basic, query_classrooms_with_amenities, find_acronyms
 from .contacts import get_contact_information
 
 # List of all tools for the agent
 tools = [
+    find_acronyms,
     validate_address,
     get_distance,
     sort_classrooms_by_distance,
@@ -18,6 +19,7 @@ tools = [
 ]
 
 __all__ = [
+    'find_acronyms',
     'validate_address',
     'get_distance',
     'sort_classrooms_by_distance',

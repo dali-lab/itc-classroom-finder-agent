@@ -7,9 +7,11 @@ from langchain_core.tools import tool
 from typing import List, Dict, Any
 import httpx
 import os
+import re
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 DEFAULT_CAMPUS = "Dartmouth College, Hanover, NH"
+
 
 
 @tool
@@ -17,13 +19,15 @@ async def validate_address(address: str) -> Dict[str, Any]:
     """
     Verify that an address exists and is correctly formatted.
     Use this to check user input before calculating distances.
+    First expands any Dartmouth building acronyms, then validates the address.
     
     Args:
-        address: The address to validate (e.g., "Baker Library, Hanover NH")
+        address: The address to validate (e.g., "Baker Library, Hanover NH" or "ECSC, Hanover NH")
     
     Returns:
         Dictionary with 'valid' status and the corrected/formatted address
     """
+    
     if not GOOGLE_MAPS_API_KEY:
         return {"valid": False, "error": "Google Maps API key not configured"}
     
@@ -59,10 +63,11 @@ async def validate_address(address: str) -> Dict[str, Any]:
 async def get_distance(origin: str, destination: str, mode: str = "walking") -> str:
     """
     Get travel distance and time between two locations.
+    If the origin or destination contains building acronyms (e.g., "HOP", "FOCO"), use `find_acronyms` first to expand them to full building names before calling this tool.
     
     Args:
-        origin: Starting address
-        destination: Ending address  
+        origin: Starting address (use full building name, e.g., "Hopkins Center, Hanover, NH" or expand acronyms first)
+        destination: Ending address (use full building name, e.g., "Class of 1953 Dining Room, Hanover, NH" or expand acronyms first)
         mode: "walking", "driving", "bicycling", or "transit"
     """
     if not GOOGLE_MAPS_API_KEY:

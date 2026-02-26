@@ -44,6 +44,38 @@ def _format_classrooms_for_llm(classroom_dicts: List[dict]) -> str:
     return '\n'.join(lines)
 
 
+@tool
+def find_acronyms(text: str) -> str:
+    """
+    Find acronyms in the given text and expand them to full building names with location.
+    ALWAYS use this tool FIRST when users mention building acronyms (HOP, FOCO, ECSC, LSC, etc.) before calling distance or address validation tools.
+    This tool automatically expands acronyms to full building names suitable for address lookups.
+    For example: "HOP" → "Hopkins Center, Hanover, NH" or "FOCO" → "Class of 1953 Dining Room, Hanover, NH".
+    """
+    import re
+    acronyms = {
+        'ECSC': 'Engineering Computer Science Center',
+        'LSC': 'Life Science Center',
+        'VAC': 'Visual Arts Center',
+        'BVAC': 'Black Family Visual Arts Center',
+        'BAKER': 'Baker Berry Library',
+        'Berry': 'Baker Berry Library',
+        'FFB': 'Baker Berry Library',
+        'HOP': 'Hopkins Center',
+        'FOCO': 'Class of 1953 Dining Room'
+    }
+    
+    result = text
+    for acronym, full_name in acronyms.items():
+        # Case-insensitive replacement with word boundaries to match only whole words
+        # \b ensures we match the acronym as a complete word, not part of another word
+        pattern = re.compile(r'\b' + re.escape(acronym) + r'\b', re.IGNORECASE)
+        # Expand to full name with location for better address matching
+        result = pattern.sub(f"{full_name}, Hanover, NH", result)
+    
+    return result
+
+
 @tool(response_format="content_and_artifact")
 def query_classrooms_basic(
     seminar_setup: bool = False,
