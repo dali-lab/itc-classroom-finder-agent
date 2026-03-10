@@ -1,6 +1,6 @@
 """
-Contact information routing system for the Classroom Finder Agent.
-Matches user queries to appropriate Dartmouth contacts using keyword-based classification.
+Contact information tool definition and helper functions for the Classroom Finder Agent
+This module defines a set of tools (and helpers) that can be used by the agent to route users to the appropriate Dartmouth office based on their questions.
 """
 
 import yaml
@@ -40,12 +40,12 @@ def find_relevant_contacts(query: str, max_contacts: int = 2) -> List[Dict[str, 
         for keyword in contact.get('keywords', []):
             keyword_lower = keyword.lower()
             # Use word boundaries for multi-word keywords or single words
-            # This prevents "av" from matching "available"
+            # e.g. this prevents "av" from matching "available"
             if len(keyword_lower) <= 2:
                 # For very short keywords, require exact word match
                 pattern = r'\b' + re.escape(keyword_lower) + r'\b'
             else:
-                # For longer keywords, allow partial matches within words
+                # For longer keywords, allow partial matches within words (typo tolerance)
                 pattern = r'\b' + re.escape(keyword_lower)
             
             if re.search(pattern, query_lower):
@@ -118,21 +118,21 @@ def get_contact_information_helper(query: str) -> str:
         # No matches found - provide general guidance
         return """I couldn't determine a specific contact for your question. Here are the main resources:
 
-**For booking or scheduling questions:** Contact the Registrar's Office
-Email: Registrar@Dartmouth.edu
-Phone: 603-646-2246
+                **For booking or scheduling questions:** Contact the Registrar's Office
+                Email: Registrar@Dartmouth.edu
+                Phone: 603-646-2246
 
-**For classroom technology or equipment questions:** Contact Classroom Technology Services
-Email: Classroom.Technology.Services@Dartmouth.edu
-Phone: 603-646-2999
-Website: https://services.dartmouth.edu/TDClient/1806/Portal/Requests/ServiceDet?ID=38206
+                **For classroom technology or equipment questions:** Contact Classroom Technology Services
+                Email: Classroom.Technology.Services@Dartmouth.edu
+                Phone: 603-646-2999
+                Website: https://services.dartmouth.edu/TDClient/1806/Portal/Requests/ServiceDet?ID=38206
 
-**For questions about this Classroom Finder tool or general IT support:** Contact ITC Dartmouth
-Email: itc@dartmouth.edu
-Phone: 603-646-2999 or 1-855-764-2485 (toll-free)
-Hours: Monday through Friday, 8:00 a.m. to 5:00 p.m. (ET)
+                **For questions about this Classroom Finder tool or general IT support:** Contact ITC Dartmouth
+                Email: itc@dartmouth.edu
+                Phone: 603-646-2999 or 1-855-764-2485 (toll-free)
+                Hours: Monday through Friday, 8:00 a.m. to 5:00 p.m. (ET)
 
-If you'd like more specific contact information, please provide more details about your question."""
+                If you'd like more specific contact information, please provide more details about your question."""
     
     # Format response
     response_parts = []

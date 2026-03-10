@@ -7,7 +7,6 @@ from langchain_core.tools import tool
 from typing import List, Dict, Any
 import httpx
 import os
-import re
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 DEFAULT_CAMPUS = "Dartmouth College, Hanover, NH"

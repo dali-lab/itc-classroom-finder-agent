@@ -1,3 +1,9 @@
+"""
+Main FastAPI application for the Classroom Finder Agent.
+This app defines the API endpoints for chatting with the agent, including a streaming endpoint for better UX. 
+It also includes error handling to return user-friendly messages in case of issues with the AI service.
+"""
+
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware

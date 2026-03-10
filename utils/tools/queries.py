@@ -372,31 +372,20 @@ def query_classrooms_with_amenities(
                     classroom_dicts
                 )
 
-        # If still nothing, drop size too and just match style
-        if not classrooms and (seminar_setup or lecture_setup or group_learning):
-            style_conditions = []
-            style_params = []
-            if seminar_setup:
-                style_conditions.append('"seminarSetup" = %s')
-                style_params.append(True)
-            if lecture_setup:
-                style_conditions.append('"lectureSetup" = %s')
-                style_params.append(True)
-            if group_learning:
-                style_conditions.append('"groupLearning" = %s')
-                style_params.append(True)
-            fallback_query = 'SELECT * FROM "Classroom" WHERE ' + ' AND '.join(style_conditions) + ' ORDER BY "seatCount" ASC LIMIT 9'
+        # If still nothing, drop style too and just match size
+        if not classrooms and class_size:
+            fallback_query = 'SELECT * FROM "Classroom" WHERE "seatCount" >= %s ORDER BY "seatCount" ASC LIMIT 9'
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute(fallback_query, style_params)
+                    cur.execute(fallback_query, [class_size])
                     classrooms = cur.fetchall()
             if classrooms:
                 classroom_dicts = _rows_to_dicts(classrooms)
                 summary = _format_classrooms_for_llm(classroom_dicts)
                 return (
-                    f"No exact match found, but here are {len(classroom_dicts)} room(s) with the requested style. "
-                    f"These are the REAL results:\n{summary}\n"
-                    "Cards are shown in the UI. Tell the user these are the closest available options and offer to refine.",
+                    f"No classrooms matched the style or amenity requirements, but found {len(classroom_dicts)} room(s) with at least {class_size} seats. "
+                    f"These are the REAL results — base your response ONLY on this data:\n{summary}\n"
+                    "Cards are shown in the UI. Tell the user no style/amenity match was found but these rooms fit the required capacity, then offer to refine.",
                     classroom_dicts
                 )
 

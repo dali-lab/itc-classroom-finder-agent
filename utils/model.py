@@ -1,3 +1,7 @@
+"""
+Model configuration for the classroom finder agent.
+"""
+
 from langchain_dartmouth.llms import ChatDartmouth
 from dotenv import load_dotenv
 import os

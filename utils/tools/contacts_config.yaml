@@ -1,3 +1,6 @@
+# Keyword relationships for routing contact questions
+# Change these to update how questions are routed to different contacts based on keywords in the question
+# The chatbot has access to a tool that uses this config to determine which contact to route a question to
 contacts:
   - name: "Registrar's Office"
     email: "Registrar@Dartmouth.edu"
