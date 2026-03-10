@@ -1,3 +1,7 @@
+"""
+Database connection utilities for the classroom finder agent.
+"""
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os

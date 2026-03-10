@@ -1,3 +1,8 @@
+"""
+This is the main entry point for the ITC Classroom Finder Agent. 
+It sets up the agent with the system prompt and tools, and provides a simple CLI for chatting with the agent.   
+"""
+
 import uuid
 
 from langchain.agents import create_agent
